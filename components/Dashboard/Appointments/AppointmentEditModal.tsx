@@ -23,6 +23,7 @@ interface AppointmentDetails {
   appointment_id: number;
   scheduled_time: string;
   status: AppointmentStatus;
+  user_id: number | null;
   price: number;
   notes: string;
   staff_id: number | null;
@@ -57,6 +58,11 @@ const AppointmentEditModal = ({
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [beforeImages, setBeforeImages] = useState<any[]>([]);
+  const [afterImages, setAfterImages] = useState<any[]>([]);
+
+  const [newBeforeUrl, setNewBeforeUrl] = useState("");
+  const [newAfterUrl, setNewAfterUrl] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
@@ -93,6 +99,7 @@ const AppointmentEditModal = ({
           setForm({
             appointment_id: apptData.appointment_id,
             scheduled_time: apptData.scheduled_time,
+            user_id: apptData.user_id,
             service_ids: apptData.services
               ? apptData.services.map((s: ServiceResponse) => s.service_id)
               : [apptData.service_id],
@@ -101,6 +108,16 @@ const AppointmentEditModal = ({
             price: apptData.price || 0,
             notes: apptData.notes || "",
           });
+        }
+        const photosRes = await fetchWithRefresh(
+          API_ENDPOINTS.PHOTOS.LIST(appointmentId),
+          { credentials: "include" }
+        );
+
+        if (photosRes.ok) {
+          const photos = await photosRes.json();
+          setBeforeImages(photos.filter((p: any) => p.photo_type === "before"));
+          setAfterImages(photos.filter((p: any) => p.photo_type === "after"));
         }
 
         if (staffRes.ok) {
@@ -348,6 +365,171 @@ const AppointmentEditModal = ({
               }}
               className="w-full border border-border rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary-light"
             />
+          </div>
+          {/* BEFORE PHOTOS */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Before Photos (URLs)
+            </label>
+
+            <div className="flex gap-2 mb-2">
+              <input
+                type="url"
+                value={newBeforeUrl}
+                onChange={(e) => setNewBeforeUrl(e.target.value)}
+                placeholder="Paste image URL"
+                className="flex-1 border rounded px-2 py-1"
+              />
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!newBeforeUrl || !appointmentId) return;
+
+                  const response = await fetchWithRefresh(
+                    API_ENDPOINTS.PHOTOS.UPLOAD,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        appointment_id: appointmentId,
+                        user_id: form.user_id, // if included in apptData
+                        staff_id: form.staff_id || null,
+                        service_id: form.service_ids[0],
+                        photo_type: "before",
+                        photo_url: newBeforeUrl,
+                      }),
+                    }
+                  );
+
+                  const data = await response.json();
+                  if (response.ok) {
+                    setBeforeImages([...beforeImages, data]);
+                    setNewBeforeUrl("");
+                  } else {
+                    alert(data.error || "Failed to add photo");
+                  }
+                }}
+                className="px-3 py-1 bg-primary text-white rounded"
+              >
+                Add
+              </button>
+            </div>
+
+            {/* Preview thumbnails */}
+            <div className="flex flex-wrap gap-2">
+              {beforeImages.map((img, i) => (
+                <div key={img.photo_id} className="relative w-20 h-20">
+                  <img
+                    src={img.photo_url}
+                    className="w-full h-full object-cover rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await fetchWithRefresh(
+                        API_ENDPOINTS.PHOTOS.DELETE(img.photo_id),
+                        { method: "DELETE", credentials: "include" }
+                      );
+
+                      if (res.ok) {
+                        setBeforeImages(
+                          beforeImages.filter(
+                            (p) => p.photo_id !== img.photo_id
+                          )
+                        );
+                      } else {
+                        alert("Failed to delete image");
+                      }
+                    }}
+                    className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* AFTER PHOTOS */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              After Photos (URLs)
+            </label>
+
+            <div className="flex gap-2 mb-2">
+              <input
+                type="url"
+                value={newAfterUrl}
+                onChange={(e) => setNewAfterUrl(e.target.value)}
+                placeholder="Paste image URL"
+                className="flex-1 border rounded px-2 py-1"
+              />
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!newAfterUrl || !appointmentId) return;
+
+                  const response = await fetchWithRefresh(
+                    API_ENDPOINTS.PHOTOS.UPLOAD,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({
+                        appointment_id: appointmentId,
+                        user_id: form.user_id,
+                        staff_id: form.staff_id || null,
+                        service_id: form.service_ids[0],
+                        photo_type: "after",
+                        photo_url: newAfterUrl,
+                      }),
+                    }
+                  );
+
+                  const data = await response.json();
+                  if (response.ok) {
+                    setAfterImages([...afterImages, data]);
+                    setNewAfterUrl("");
+                  } else {
+                    alert(data.error || "Failed to add photo");
+                  }
+                }}
+                className="px-3 py-1 bg-primary text-white rounded"
+              >
+                Add
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {afterImages.map((img) => (
+                <div key={img.photo_id} className="relative w-20 h-20">
+                  <img
+                    src={img.photo_url}
+                    className="w-full h-full object-cover rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const res = await fetchWithRefresh(
+                        API_ENDPOINTS.PHOTOS.DELETE(img.photo_id),
+                        { method: "DELETE", credentials: "include" }
+                      );
+
+                      if (res.ok) {
+                        setAfterImages(
+                          afterImages.filter((p) => p.photo_id !== img.photo_id)
+                        );
+                      }
+                    }}
+                    className="absolute top-1 right-1 bg-red-500 text-white text-xs rounded px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
