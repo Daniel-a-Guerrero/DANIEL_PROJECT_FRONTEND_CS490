@@ -77,7 +77,7 @@ const AppointmentPhotoUpload: React.FC<AppointmentPhotoUploadProps> = ({
     setUploading(true);
     setError("");
     setMessage("");
-
+    console.log(`appt ID: ${appointmentId} photoIS ${selectedType} and ${previewFile} staff ${staffId} service ${serviceId}`);
     const result = await uploadAppointmentPhoto({
       appointment_id: appointmentId,
       photo_type: selectedType,
